@@ -1,0 +1,39 @@
+# Example usage: python train.py --data manga109.yaml
+# parent
+# ├── yolov5
+# └── datasets
+#     └── Manga109
+
+path: ../datasets/Manga109
+train: images/train  # train images 70% of manga109 pictures
+val: images/val  # val images 20% of manga109 pictures
+test: images/test  # test images () 10% of manga109 pictures - not used to train model
+
+
+
+# Classes
+nc: 2  # number of classes
+names: ['frame', 'text']  # class names
+
+# Training model command
+# Launch Anaconda Prompt
+# conda activate mangaocr
+# cd Documents\DEV\mangaocr_v2\yolov5-6.0
+# Dual GPU? $python -m torch.distributed.run --nproc_per_node 2 train.py --img 1280 --workers 1 --batch 64 --epochs 300 --data Manga109.yaml --weights yolov5l6.pt --cfg yolov5l6.yaml
+# Single GPU $python train.py --img 1280 --workers 1 --batch 3 --epochs 300 --data Manga109.yaml --weights yolov5l6.pt --cfg yolov5l6.yaml
+
+
+# Fix error:
+# OMP: Error #15: Initializing libiomp5md.dll, but found libiomp5md.dll already initialized.
+# import os
+# os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+
+# optimizer: SGD with parameter groups 131 weight, 135 weight (no decay), 135 bias
+# DP not recommended, instead use torch.distributed.run for best DDP Multi-GPU results.
+# See Multi-GPU Tutorial at https://github.com/ultralytics/yolov5/issues/475 to get started.
+
+
+
+
+

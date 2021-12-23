@@ -177,7 +177,8 @@ def copyFile(source, target):
 
 def saveTxt(labelArray, target):
     print("saving file:", target)
-    if labelArray is None:
+    if len(labelArray) == 0:
+        print("no feature to save for this image")
         return "image has no features to save"
     labelTxt = open(target, "w+")
     for label in labelArray:
@@ -276,38 +277,26 @@ def cleanData(target):
 
 
 def saveSplit(trainImgItems, validateImgItems, testImgItems, trainTxtItems, validateTxtItems, testTxtItems):
-    #     cleanData("yolov5-5.0/datasets/Manga109/images/trainManga109/")
-    #     time.sleep(1)
-    #     cleanData("yolov5-5.0/datasets/Manga109/labels/trainManga109/")
-    #     time.sleep(1)
-    #     cleanData("yolov5-5.0/datasets/Manga109/images/valManga109/")
-    #     time.sleep(1)
-    #     cleanData("yolov5-5.0/datasets/Manga109/labels/valManga109/")
-    #     time.sleep(1)
-    #     cleanData("yolov5-5.0/datasets/Manga109/images/testManga109/")
-    #     time.sleep(1)
-    #     cleanData("yolov5-5.0/datasets/Manga109/labels/testManga109/")
-    #     time.sleep(1)
-
-    shutil.rmtree("yolov5-5.0/")
+    shutil.rmtree("Manga109")
+    os.makedirs("Manga109", exist_ok=True)
     if len(trainImgItems) != 0:
         print("Saving training data")
-        os.makedirs("yolov5-5.0/datasets/Manga109/images/trainManga109/", exist_ok=True)
-        os.makedirs("yolov5-5.0/datasets/Manga109/labels/trainManga109/", exist_ok=True)
-        saveFormattedImg(trainImgItems, "yolov5-5.0/datasets/Manga109/images/trainManga109/")
-        saveFormattedTxt(trainTxtItems, "yolov5-5.0/datasets/Manga109/labels/trainManga109/")
+        os.makedirs("Manga109/images/train/", exist_ok=True)
+        os.makedirs("Manga109/labels/train/", exist_ok=True)
+        saveFormattedImg(trainImgItems, "Manga109/images/train/")
+        saveFormattedTxt(trainTxtItems, "Manga109/labels/train/")
     if len(validateImgItems) != 0:
         print("Saving validation data")
-        os.makedirs("yolov5-5.0/datasets/Manga109/images/valManga109/", exist_ok=True)
-        os.makedirs("yolov5-5.0/datasets/Manga109/labels/valManga109/", exist_ok=True)
-        saveFormattedImg(validateImgItems, "yolov5-5.0/datasets/Manga109/images/valManga109/")
-        saveFormattedTxt(validateTxtItems, "yolov5-5.0/datasets/Manga109/labels/valManga109/")
+        os.makedirs("Manga109/images/val/", exist_ok=True)
+        os.makedirs("Manga109/labels/val/", exist_ok=True)
+        saveFormattedImg(validateImgItems, "Manga109/images/val/")
+        saveFormattedTxt(validateTxtItems, "Manga109/labels/val/")
     if len(testImgItems) != 0:
         print("Saving test data")
-        os.makedirs("yolov5-5.0/datasets/Manga109/images/testManga109/", exist_ok=True)
-        os.makedirs("yolov5-5.0/datasets/Manga109/labels/testManga109/", exist_ok=True)
-        saveFormattedImg(testImgItems, "yolov5-5.0/datasets/Manga109/images/testManga109/")
-        saveFormattedTxt(testTxtItems, "yolov5-5.0/datasets/Manga109/labels/testManga109/")
+        os.makedirs("Manga109/images/test/", exist_ok=True)
+        os.makedirs("Manga109/labels/test/", exist_ok=True)
+        saveFormattedImg(testImgItems, "Manga109/images/test/")
+        saveFormattedTxt(testTxtItems, "Manga109/labels/test/")
 
 
 if __name__ == "__main__":
