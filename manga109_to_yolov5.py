@@ -6,6 +6,7 @@ import shutil
 import time
 import numpy as np
 import os
+import random
 
 np.set_printoptions(linewidth=1000)
 
@@ -18,9 +19,9 @@ p = manga109api.Parser(root_dir=manga109_root_dir)
 # names: ['body', 'frame', 'face', 'text']  # class names
 # (if no objects in image, no *.txt file is required)
 
-def readPageLabel(page, labelType):
+def readPageLabel(page, labelType, labelValue):
+    # labelValues "body": 0, "frame": 1, "face": 2, "text": 3
     labelDict = page.get(labelType)
-    labelNames = {"body": 9, "frame": 0, "face": 9, "text": 1}
     # un-normalized data
     labelArray = []
     if len(labelDict) == 0:
@@ -34,7 +35,7 @@ def readPageLabel(page, labelType):
         xmin = label.get('@xmin')
         ymax = label.get('@ymax')
         ymin = label.get('@ymin')
-        className = labelNames.get(labelType)
+        className = labelValue
         xcenter = ((xmax + xmin) / 2) / unWidth
         ycenter = ((ymax + ymin) / 2) / unHeight
         width = math.sqrt(xmax * xmax - xmin * xmin) / unWidth
@@ -44,21 +45,23 @@ def readPageLabel(page, labelType):
     return labelArray
 
 
-def readBook(bookName):
+def readBook(bookName, body, frame, face, text):
     bookAnnotation = p.get_annotation(book=bookName)
     # use dict because numpy matrix row has to have same length
     bookPageLabels = {}
     pageNumber = 0
     for page in bookAnnotation["page"]:
         pageLabels = []
-        # body = readPageLabel(page, "body")
-        frame = readPageLabel(page, "frame")
-        # face = readPageLabel(page, "face")
-        text = readPageLabel(page, "text")
-        # pageLabels.append(body)
-        pageLabels.append(frame)
-        # pageLabels.append(face)
-        pageLabels.append(text)
+        if body:
+            pageLabels.append(readPageLabel(page, "body", 9))
+        if frame:
+            pageLabels.append(readPageLabel(page, "frame", 0))
+        if face:
+            face = readPageLabel(page, "face", 9)
+            pageLabels.append(face)
+        if text:
+            text = readPageLabel(page, "text", 1)
+            pageLabels.append(text)
         bookPageLabels[pageNumber] = pageLabels
         pageNumber += 1
     return bookPageLabels
@@ -147,10 +150,10 @@ def outputPaths(data):
             allImages.append([imgPath, tgtFilename + ".jpg"])
             page = book.get(pageNumber)
             pageLabels = []
-            if page == [None, None, None, None]:
+            if page == [None, None, None, None] or page == [None, None]:
                 #                 print("page has no labels")
                 pageLabels.append(None)
-            if page != [None, None, None, None]:
+            else:
                 #                 print("page:", len(page))
                 for labels in page:
                     if labels != None:
@@ -161,12 +164,39 @@ def outputPaths(data):
             globalImgNumber += 1
     return allImages, allBookLabels
 
+def skippedPages(data):
+    globalImgNumber = 0
+    allBookLabels = []
+    allImages = []
+    skipped_pages = []
+    for bookNumber in range(0, len(data)):
+        # book = 0->108
+        book = data[bookNumber]
+        bookName = p.books[bookNumber]
+        bookPageCount = pageCount(bookName)
+        for pageNumber in range(0, bookPageCount):
+            imgPath = p.img_path(book=bookName, index=pageNumber)
+            tgtFilename = "im" + str(globalImgNumber)
+            allImages.append([imgPath, tgtFilename + ".jpg"])
+            page = book.get(pageNumber)
+            pageLabels = []
+            if page == [None, None, None, None] or page == [None, None]:
+                filename = "im" + str(globalImgNumber) + ".jpg"
+                skipped_pages.append(filename)
+            # elif page[1]==None and page[3]==None:
+            #     filename = "im" + str(globalImgNumber) + ".jpg"
+            #     skipped_pages.append(filename)
+            globalImgNumber += 1
+    return skipped_pages
+
+
+
 
 def readAllBooks():
     #     multithreading doesn't work for this
     allBookLabels = []
     for book in p.books:
-        allBookLabels.append(readBook(book))
+        allBookLabels.append(readBook(book, False, True, False, True))
     return allBookLabels
 
 
@@ -178,6 +208,9 @@ def copyFile(source, target):
 def saveTxt(labelArray, target):
     print("saving file:", target)
     if len(labelArray) == 0:
+        print("no feature to save for this image")
+        return "image has no features to save"
+    elif labelArray[0] is None:
         print("no feature to save for this image")
         return "image has no features to save"
     labelTxt = open(target, "w+")
@@ -236,16 +269,17 @@ def saveFormattedTxt(dataArray, targetFilename):
 def dataSplitGenerator(data, seed, trainP, validateP, testP, allImages, allBookLabels):
     totalItems = imageCount(data)
     rng = np.random.default_rng(seed)
-    rints = rng.integers(low=0, high=totalItems, size=totalItems)
+    random.seed(seed)
+    rints = random.sample(range(0, totalItems), totalItems)
     trainCount, validateCount, testCount = splitNumber(trainP, validateP, testP, totalItems)
 
     #   Arrays with data copied to rints index values
-    rImages = allImages
-    rBookLabels = allBookLabels
+    rImages = []
+    rBookLabels = []
     for i in range(0, len(allImages)):
         randomIndex = rints[i]
-        rImages[i] = allImages[randomIndex]
-        rBookLabels[i] = allBookLabels[randomIndex]
+        rImages.append(allImages[randomIndex])
+        rBookLabels.append(allBookLabels[randomIndex])
 
     if testP != 0:
         trainImgItems = rImages[:trainCount]
@@ -274,6 +308,63 @@ def cleanData(target):
     shutil.rmtree(target)
     print(os.path.dirname(target))
     os.makedirs(os.path.dirname(target), exist_ok=True)
+
+
+def errorCheck(data, trainImgItems, validateImgItems, testImgItems, trainTxtItems, validateTxtItems, testTxtItems):
+    data = readAllBooks()
+    img_count = imageCount(data)
+
+    trainfilenames = []
+    validfilenames = []
+    testfilenames = []
+    for i in range(0, len(trainImgItems)):
+        trainfilenames.append(trainImgItems[i][1])
+    for i in range(0, len(validateImgItems)):
+        validfilenames.append(validateImgItems[i][1])
+    for i in range(0, len(testImgItems)):
+        testfilenames.append(testImgItems[i][1])
+    allfilenames = []
+    allfilenames.extend(trainfilenames)
+    allfilenames.extend(validfilenames)
+    allfilenames.extend(testfilenames)
+
+    # print(allfilenames)
+    duplicate_count = 0
+    skipped_count = 0
+    for i in range(0, img_count):
+        img_filename = "im" + str(i) + ".jpg"
+        duplicates = allfilenames.count(img_filename)
+        if duplicates > 1:
+            duplicate_count += duplicates
+            # print("%d duplicates found of %s" % (duplicates, img_filename))
+        if img_filename not in allfilenames:
+            skipped_count += 1
+            # print("%s was skipped" %(img_filename))
+
+    traintxt = []
+    validtxt = []
+    testtxt = []
+    for i in range(0, len(trainTxtItems)):
+        traintxt.append(trainTxtItems[i][0])
+    for i in range(0, len(validateTxtItems)):
+        validtxt.append(validateTxtItems[i][0])
+    for i in range(0, len(testTxtItems)):
+        testtxt.append(testTxtItems[i][0])
+    alltxt = []
+    alltxt.extend(traintxt)
+    alltxt.extend(validtxt)
+    alltxt.extend(testtxt)
+
+    skips = skippedPages(data)
+    totalPages = imageCount(data)
+    print("skips|totalPages", len(skips), totalPages)
+    print(len(skips) / totalPages * 100, "% of Manga109 pages have no corresponding text file because of missing data")
+    print((totalPages-len(alltxt))/totalPages * 100, "% of yolo dataset images have no corresponding text file because of missing data")
+
+    print("skipped | all img_count ", skipped_count, img_count)
+    print((skipped_count / img_count) * 100, "% of all yolo dataset output images are skipped!")
+    print("duplicate_count | len(allfilenames) ", duplicate_count, len(allfilenames))
+    print((duplicate_count/len(allfilenames))*100, "% of all yolo dataset output images are duplicates!")
 
 
 def saveSplit(trainImgItems, validateImgItems, testImgItems, trainTxtItems, validateTxtItems, testTxtItems):
@@ -319,6 +410,7 @@ if __name__ == "__main__":
     s3 = time.time() - splitStart
     print(f"\nFinished splitting formatted data, Time taken: {time.time() - splitStart}\n")
 
+    errorCheck(data, trainImgItems, validateImgItems, testImgItems, trainTxtItems, validateTxtItems, testTxtItems)
     print("Saving train/validate data...")
     saveStart = time.time()
     saveSplit(trainImgItems, validateImgItems, testImgItems, trainTxtItems, validateTxtItems, testTxtItems)
